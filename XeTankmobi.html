@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tank Zombie Survival Pro</title>
+    <style>
+        :root { --p1-color: #3498db; --zombie-color: #2ecc71; --accent: #f1c40f; }
+        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: sans-serif; touch-action: none; }
+        #gameWrapper { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        canvas { background: #2c3e50; display: block; max-width: 95%; max-height: 60%; border: 3px solid #444; border-radius: 5px; }
+        
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; color: white; pointer-events: none; font-weight: bold; font-size: 18px; z-index: 5; }
+        .controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-around; align-items: center; }
+        .dpad { display: grid; grid-template-columns: repeat(3, 65px); gap: 10px; }
+        .btn { width: 65px; height: 65px; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; user-select: none; }
+        .btn:active { background: rgba(255,255,255,0.4); transform: scale(0.9); }
+        .btn-shoot { width: 90px; height: 90px; background: rgba(231, 76, 60, 0.6); border-color: #e74c3c; font-size: 20px; }
+
+        #menu { position: absolute; inset: 0; background: rgba(0,0,0,0.95); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .menu-btn { padding: 18px 35px; margin: 12px; background: var(--accent); border: none; border-radius: 10px; font-weight: bold; font-size: 18px; width: 250px; cursor: pointer; box-shadow: 0 4px #d4ac0d; }
+        .menu-btn:active { transform: translateY(2px); box-shadow: 0 2px #d4ac0d; }
+    </style>
+</head>
+<body>
+
+<div id="gameWrapper">
+    <div id="ui">
+        SCORE: <span id="score">0</span> | HP: <span id="hp">5</span> | MAP: <span id="mapNum">1</span>
+    </div>
+    
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="menu">
+        <h1 style="color:var(--accent); font-size: 40px; margin-bottom: 30px;">TANK WARRIOR</h1>
+        <button class="menu-btn" onclick="initGame('zombie')">CHẾ ĐỘ ZOMBIE</button>
+        <button class="menu-btn" style="background:#e67e22" onclick="initGame('boss')">CHẾ ĐỘ BOSS (5 MAP)</button>
+        <p style="color: #888; margin-top: 20px;">Dùng nút ảo để di chuyển và bắn</p>
+    </div>
+
+    <div class="controls">
+        <div class="dpad">
+            <div style="grid-column:2" class="btn" id="btnUp">↑</div>
+            <div style="grid-column:1" class="btn" id="btnLeft">←</div>
+            <div style="grid-column:2" class="btn" id="btnDown">↓</div>
+            <div style="grid-column:3" class="btn" id="btnRight">→</div>
+        </div>
+        <div class="btn btn-shoot" id="btnShoot">BẮN</div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 640; canvas.height = 360;
+
+const BLOCK_SIZE = 40;
+let gameActive = false;
+let gameMode = 'zombie';
+let score = 0;
+let mapIndex = 0;
+let entities = [];
+let bullets = [];
+let items = [];
+let frameCount = 0;
+let keys = { up: false, down: false, left: false, right: false, shoot: false };
+
+const maps = [
+    ["1111111111111111", "1000000000000001", "1011000000001101", "1000001111000001", "1000001111000001", "1011000000001101", "1000000000000001", "1111111111111111"],
+    ["1111111111111111", "1000011001100001", "1000000000000001", "1011000000001101", "1011000000001101", "1000000000000001", "1000011001100001", "1111111111111111"],
+    ["1111111111111111", "1000000000000001", "1001100110011001", "1000000000000001", "1000000000000001", "1001100110011001", "1000000000000001", "1111111111111111"],
+    ["1111111111111111", "1011000000001101", "1011000000001101", "1000000110000001", "1000000110000001", "1011000000001101", "1011000000001101", "1111111111111111"],
+    ["1111111111111111", "1000001111000001", "1011000000001101", "1011000110001101", "1011000110001101", "1011000000001101", "1000001111000001", "1111111111111111"]
+];
+
+// --- CẢI TIẾN VA CHẠM (CHỐNG KẸT) ---
+function checkWallCollision(x, y, radius) {
+    // Kiểm tra 8 điểm xung quanh vòng tròn để bao phủ toàn bộ thân xe
+    for (let i = 0; i < 8; i++) {
+        let angle = (i / 8) * Math.PI * 2;
+        let checkX = x + Math.cos(angle) * radius;
+        let checkY = y + Math.sin(angle) * radius;
+        
+        let gx = Math.floor(checkX / BLOCK_SIZE);
+        let gy = Math.floor(checkY / BLOCK_SIZE);
+        
+        let map = maps[mapIndex];
+        if (map[gy] && map[gy][gx] === '1') return true;
+    }
+    return false;
+}
+
+class Tank {
+    constructor(x, y) {
+        this.x = x; this.y = y; this.radius = 12; this.angle = 0;
+        this.hp = 5; this.gunLv = 1; this.cooldown = 0;
+    }
+    update() {
+        if (this.cooldown > 0) this.cooldown--;
+        let move = 0, turn = 0;
+        if (keys.up) move = 1; if (keys.down) move = -0.7;
+        if (keys.left) turn = -1; if (keys.right) turn = 1;
+
+        this.angle += turn * 0.08;
+        let nextX = this.x + Math.cos(this.angle) * move * 3.5;
+        let nextY = this.y + Math.sin(this.angle) * move * 3.5;
+
+        // Sliding Collision: Nếu không đi thẳng được, thử tách riêng trục X và Y
+        if (!checkWallCollision(nextX, nextY, this.radius)) {
+            this.x = nextX; this.y = nextY;
+        } else {
+            if (!checkWallCollision(nextX, this.y, this.radius)) this.x = nextX;
+            else if (!checkWallCollision(this.x, nextY, this.radius)) this.y = nextY;
+        }
+
+        if (keys.shoot && this.cooldown <= 0) this.shoot();
+        
+        // Ăn đồ nâng cấp
+        items = items.filter(it => {
+            if (Math.hypot(this.x - it.x, this.y - it.y) < 25) {
+                if (this.gunLv < 4) this.gunLv++;
+                return false;
+            }
+            return true;
+        });
+    }
+    shoot() {
+        let count = this.gunLv === 4 ? 3 : 1;
+        for(let i=0; i<count; i++) {
+            let offset = (i - (count-1)/2) * 0.2;
+            bullets.push(new Bullet(this.x, this.y, this.angle + offset, true, this.gunLv >= 3 ? 2 : 1));
+        }
+        this.cooldown = this.gunLv >= 2 ? 12 : 22;
+    }
+    draw() {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+        ctx.fillStyle = "var(--p1-color)"; ctx.beginPath(); ctx.arc(0,0,this.radius,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#333"; ctx.fillRect(0, -4, 18, 8);
+        ctx.restore();
+    }
+}
+
+class Zombie {
+    constructor(x, y) {
+        this.x = x; this.y = y; this.radius = 10; this.hp = gameMode === 'boss' ? 50 : 2;
+        this.isBoss = gameMode === 'boss';
+    }
+    update(p) {
+        let angle = Math.atan2(p.y - this.y, p.x - this.x);
+        let speed = this.isBoss ? 0.8 : 1.3;
+        let nx = this.x + Math.cos(angle) * speed;
+        let ny = this.y + Math.sin(angle) * speed;
+        if(!checkWallCollision(nx, ny, this.radius)) { this.x = nx; this.y = ny; }
+        if(Math.hypot(p.x-this.x, p.y-this.y) < p.radius + this.radius) p.hp -= 0.03;
+    }
+    draw() {
+        ctx.fillStyle = this.isBoss ? "red" : "var(--zombie-color)";
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * (this.isBoss?2.5:1), 0, Math.PI*2); ctx.fill();
+    }
+}
+
+class Bullet {
+    constructor(x, y, angle, isPlayer, dmg) {
+        this.x = x; this.y = y; this.vx = Math.cos(angle)*6; this.vy = Math.sin(angle)*6;
+        this.active = true; this.dmg = dmg;
+    }
+    update() {
+        this.x += this.vx; this.y += this.vy;
+        if (checkWallCollision(this.x, this.y, 2)) this.active = false;
+    }
+    draw() { ctx.fillStyle = "yellow"; ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI*2); ctx.fill(); }
+}
+
+// --- QUẢN LÝ GAME ---
+function initGame(mode) {
+    gameMode = mode;
+    document.getElementById('menu').style.display = 'none';
+    score = 0; mapIndex = 0; frameCount = 0;
+    entities = [new Tank(80, 80)];
+    bullets = []; items = [];
+    gameActive = true;
+    requestAnimationFrame(loop);
+}
+
+function showHomeMenu(msg) {
+    gameActive = false;
+    alert(msg);
+    document.getElementById('menu').style.display = 'flex'; // Quay về trang chủ
+}
+
+function loop() {
+    if (!gameActive) return;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    frameCount++;
+
+    // Vẽ Map
+    ctx.fillStyle = "#34495e";
+    maps[mapIndex].forEach((row, y) => {
+        row.split('').forEach((col, x) => {
+            if(col === '1') ctx.fillRect(x*BLOCK_SIZE, y*BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        });
+    });
+
+    let p = entities[0];
+    p.update(); p.draw();
+
+    // Spawn quái
+    if(gameMode === 'zombie' && frameCount % 90 === 0) {
+        entities.push(new Zombie(canvas.width - 50, Math.random() * canvas.height));
+    } else if(gameMode === 'boss' && entities.length === 1) {
+        entities.push(new Zombie(canvas.width/2, canvas.height/2));
+    }
+
+    // Logic quái
+    for(let i=entities.length-1; i>0; i--) {
+        let z = entities[i]; z.update(p); z.draw();
+        if(z.hp <= 0) {
+            score += z.isBoss ? 500 : 20;
+            if(Math.random() < 0.3) items.push({x:z.x, y:z.y});
+            entities.splice(i, 1);
+            if(z.isBoss) {
+                if(mapIndex < 4) { mapIndex++; alert("QUA MÀN! TIẾP THEO: MAP " + (mapIndex+1)); p.x=80; p.y=80; }
+                else { showHomeMenu("BẠN ĐÃ CHIẾN THẮNG TẤT CẢ MAP!"); return; }
+            }
+        }
+    }
+
+    // Đạn
+    bullets = bullets.filter(b => {
+        b.update(); b.draw();
+        entities.forEach((en, i) => {
+            if(i > 0 && Math.hypot(b.x-en.x, b.y-en.y) < 25) { en.hp -= b.dmg; b.active = false; }
+        });
+        return b.active && b.x > 0 && b.x < canvas.width && b.y > 0 && b.y < canvas.height;
+    });
+
+    // Vẽ item
+    items.forEach(it => { ctx.fillStyle = "#00ffff"; ctx.fillRect(it.x-8, it.y-8, 16, 16); });
+
+    document.getElementById('score').innerText = score;
+    document.getElementById('hp').innerText = Math.ceil(p.hp);
+    document.getElementById('mapNum').innerText = mapIndex + 1;
+
+    if(p.hp <= 0) { showHomeMenu("GAME OVER! SCORE: " + score); return; }
+    requestAnimationFrame(loop);
+}
+
+// Controls
+const b = (id, k) => {
+    let el = document.getElementById(id);
+    el.ontouchstart = (e) => { e.preventDefault(); keys[k] = true; };
+    el.ontouchend = (e) => { e.preventDefault(); keys[k] = false; };
+};
+b('btnUp','up'); b('btnDown','down'); b('btnLeft','left'); b('btnRight','right'); b('btnShoot','shoot');
+</script>
+</body>
+</html>
