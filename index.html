@@ -3,94 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tank Joystick Survival</title>
+    <title>Red Tank: Landscape Survival</title>
     <style>
         :root {
-            --player-color: #e74c3c; /* Đỏ */
-            --zombie-color: #2ecc71; /* Xanh lá */
-            --wall-color: #2c3e50;
-            --bg-color: #95a5a6; /* Xám sáng */
+            --player: #ff0000; /* Đỏ rực */
+            --zombie: #27ae60; /* Xanh lá */
+            --bg: #bdc3c7;     /* Nền sáng */
+            --wall: #34495e;
             --accent: #f1c40f;
         }
-        body { margin: 0; overflow: hidden; background: #333; font-family: 'Segoe UI', sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
         
-        #gameWrapper { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #000; }
+        #gameWrapper { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
         
-        canvas { 
-            background: var(--bg-color); 
-            display: block; 
-            /* Giữ tỉ lệ khung hình nhưng lấp đầy tối đa */
-            width: 100%; height: 100%; 
-            object-fit: contain;
-        }
+        canvas { display: block; background: var(--bg); max-width: 100%; max-height: 100%; object-fit: contain; }
 
-        /* UI Lớp trên */
-        #uiLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        /* UI */
+        #ui { position: absolute; top: 10px; width: 100%; display: flex; justify-content: center; gap: 15px; color: #000; font-weight: bold; pointer-events: none; z-index: 10; }
         
-        /* Stats Bar */
-        .stats { 
-            position: absolute; top: 10px; width: 100%; 
-            display: flex; justify-content: center; gap: 20px;
-            color: white; font-weight: bold; font-size: 18px; 
-            text-shadow: 2px 2px 0 #000;
-        }
+        /* Joystick */
+        #joyZone { position: absolute; bottom: 30px; left: 30px; width: 140px; height: 140px; }
+        .joy-base { width: 100%; height: 100%; background: rgba(0,0,0,0.1); border: 2px solid #000; border-radius: 50%; position: relative; }
+        .joy-stick { width: 50px; height: 50px; background: #000; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-        /* Joystick Zone (Left) */
-        #joystickZone {
-            position: absolute; bottom: 20px; left: 20px;
-            width: 150px; height: 150px;
-            pointer-events: auto; /* Nhận cảm ứng */
-        }
-        
-        /* Joystick Visuals */
-        .joystick-base {
-            width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            border-radius: 50%;
-            position: relative;
-        }
-        .joystick-stick {
-            width: 60px; height: 60px;
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            transition: transform 0.1s; /* Mượt mà khi thả tay */
-        }
-
-        /* Shoot Button (Right) */
-        #shootBtn {
-            position: absolute; bottom: 40px; right: 40px;
-            width: 90px; height: 90px;
-            background: rgba(231, 76, 60, 0.8);
-            border: 4px solid #c0392b;
-            border-radius: 50%;
-            pointer-events: auto;
-            display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: bold; font-size: 18px;
-            box-shadow: 0 0 15px rgba(231, 76, 60, 0.6);
-        }
-        #shootBtn:active { transform: scale(0.9); background: white; color: red; }
+        /* Shoot */
+        #shootBtn { position: absolute; bottom: 40px; right: 40px; width: 90px; height: 90px; background: var(--player); border: 4px solid #fff; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
 
         /* Menu */
-        #menu {
-            position: absolute; inset: 0; background: rgba(0,0,0,0.9); 
-            z-index: 100; display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; pointer-events: auto;
-        }
-        .btn-menu {
-            margin: 10px; padding: 20px 40px;
-            font-size: 20px; font-weight: bold;
-            color: white; background: var(--player-color);
-            border: none; border-radius: 50px;
-            box-shadow: 0 5px 0 #c0392b;
-            cursor: pointer;
-        }
-        .btn-menu:active { transform: translateY(5px); box-shadow: none; }
-
+        #menu { position: absolute; inset: 0; background: rgba(255,255,255,0.95); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn { padding: 15px 40px; margin: 10px; border: none; border-radius: 30px; font-weight: bold; font-size: 18px; color: white; background: #2c3e50; cursor: pointer; width: 250px; }
+        .btn-red { background: var(--player); }
     </style>
 </head>
 <body>
@@ -98,424 +40,197 @@
 <div id="gameWrapper">
     <canvas id="gameCanvas"></canvas>
     
-    <div id="uiLayer">
-        <div class="stats">
-            <span>ĐIỂM: <span id="score">0</span></span>
-            <span>MÁU: <span id="hp">5</span></span>
-            <span>SÚNG LV: <span id="gun">1</span></span>
-        </div>
-
-        <div id="joystickZone">
-            <div class="joystick-base">
-                <div class="joystick-stick" id="stick"></div>
-            </div>
-        </div>
-
-        <div id="shootBtn">BẮN</div>
+    <div id="ui">
+        <span>ĐIỂM: <span id="sc">0</span></span>
+        <span>MÁU: <span id="hp">5</span></span>
+        <span>SÚNG LV: <span id="lv">1</span></span>
     </div>
 
+    <div id="joyZone"><div class="joy-base"><div class="joy-stick" id="stick"></div></div></div>
+    <div id="shootBtn">BẮN</div>
+
     <div id="menu">
-        <h1 style="color: var(--accent); font-size: 40px; margin-bottom: 20px;">RED TANK SURVIVAL</h1>
-        <button class="btn-menu" onclick="startGame(true)">BẮT ĐẦU (FULLSCREEN)</button>
-        <button class="btn-menu" style="background: #34495e; font-size: 16px;" onclick="startGame(false)">CHẾ ĐỘ THƯỜNG</button>
-        <p style="color: #aaa; margin-top: 20px;">Kéo vòng tròn bên trái để di chuyển</p>
+        <h1 style="color:var(--player); font-size: 32px;">RED TANK MOBILE</h1>
+        <button class="btn btn-red" onclick="start(true)">XOAY NGANG & CHƠI</button>
+        <button class="btn" onclick="start(false)">CHẾ ĐỘ CỬA SỔ</button>
+        <p style="font-size: 12px; color: #666;">*Nếu không xoay ngang, hãy bật 'Tự động xoay' trên điện thoại</p>
     </div>
 </div>
 
 <script>
-/** CẤU HÌNH & KHỞI TẠO **/
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+canvas.width = 800; canvas.height = 450;
 
-// Thiết lập canvas full HD ảo, sẽ scale theo CSS
-const GAME_WIDTH = 960;
-const GAME_HEIGHT = 540;
-canvas.width = GAME_WIDTH;
-canvas.height = GAME_HEIGHT;
+const GRID = 50; 
+const WALL_THICK = 10; // Tường siêu mỏng để không bị kẹt
+const TANK_R = 12;      // Nhân vật nhỏ lại
 
-const BLOCK_SIZE = 60; // Ô lưới lớn
-const WALL_SIZE = 40;  // Tường nhỏ hơn ô lưới (để tạo khoảng hở rộng)
-const TANK_RADIUS = 18; // Xe tăng nhỏ gọn
+let active = false;
+let score = 0, frame = 0;
+let player, enemies = [], bullets = [], items = [];
+let joy = { active: false, x: 0, y: 0, ang: 0 };
+let shooting = false;
 
-// Biến Game
-let gameRunning = false;
-let score = 0;
-let enemies = [];
-let bullets = [];
-let items = [];
-let particles = [];
-let frame = 0;
-
-// Joystick State
-let stickData = { active: false, x: 0, y: 0, angle: 0, force: 0 };
-let shootPressed = false;
-
-// Map (1: Tường, 0: Đất) - Thiết kế rất thoáng
 const map = [
     "1111111111111111",
     "1000000000000001",
+    "1011000000001101",
+    "1000000110000001",
+    "1011000000001101",
     "1000000000000001",
-    "1001100000011001",
-    "1001100000011001",
-    "1000001111000001",
-    "1000000000000001",
+    "1000011111100001",
     "1000000000000001",
     "1111111111111111"
 ];
-// Map scale theo màn hình (16x9 blocks)
 
-/* --- XỬ LÝ ĐẦU VÀO (JOYSTICK & TOUCH) --- */
-const joystickZone = document.getElementById('joystickZone');
-const stick = document.getElementById('stick');
-const shootBtn = document.getElementById('shootBtn');
-
-// Hàm xử lý Joystick
-const handleJoystick = (touchX, touchY, isEnd) => {
-    if (isEnd) {
-        stick.style.transform = `translate(-50%, -50%)`;
-        stickData = { active: false, x: 0, y: 0, angle: stickData.angle, force: 0 };
-        return;
-    }
-
-    const rect = joystickZone.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    let dx = touchX - centerX;
-    let dy = touchY - centerY;
-    let distance = Math.sqrt(dx*dx + dy*dy);
-    const maxDist = rect.width / 2;
-
-    // Giới hạn khoảng cách kéo
-    if (distance > maxDist) {
-        dx = (dx / distance) * maxDist;
-        dy = (dy / distance) * maxDist;
-        distance = maxDist;
-    }
-
-    // Cập nhật giao diện
-    stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-
-    // Cập nhật dữ liệu game
-    stickData.active = true;
-    stickData.x = dx / maxDist;
-    stickData.y = dy / maxDist;
-    stickData.angle = Math.atan2(dy, dx);
-    stickData.force = distance / maxDist;
-};
-
-joystickZone.addEventListener('touchstart', e => handleJoystick(e.touches[0].clientX, e.touches[0].clientY, false));
-joystickZone.addEventListener('touchmove', e => { e.preventDefault(); handleJoystick(e.touches[0].clientX, e.touches[0].clientY, false); });
-joystickZone.addEventListener('touchend', e => handleJoystick(0, 0, true));
-
-shootBtn.addEventListener('touchstart', e => { e.preventDefault(); shootPressed = true; });
-shootBtn.addEventListener('touchend', e => { e.preventDefault(); shootPressed = false; });
-
-
-/* --- CÁC LỚP ĐỐI TƯỢNG (GAME CLASSES) --- */
-
-class Player {
-    constructor() {
-        this.x = 100; this.y = 100;
-        this.angle = 0;
-        this.hp = 5;
-        this.gunLv = 1;
-        this.cooldown = 0;
-        this.speed = 5;
-    }
-
-    update() {
-        // Di chuyển bằng Joystick
-        if (stickData.active && stickData.force > 0.1) {
-            this.angle = stickData.angle;
-            
-            // Tính toán vị trí dự kiến
-            let nextX = this.x + Math.cos(this.angle) * this.speed * stickData.force;
-            let nextY = this.y + Math.sin(this.angle) * this.speed * stickData.force;
-
-            // Xử lý va chạm thông minh (Trượt tường)
-            if (!checkWall(nextX, nextY)) {
-                this.x = nextX; this.y = nextY;
-            } else {
-                // Nếu kẹt, thử trượt theo trục X hoặc Y
-                if (!checkWall(nextX, this.y)) this.x = nextX;
-                else if (!checkWall(this.x, nextY)) this.y = nextY;
-            }
+/* --- ÉP XOAY MÀN HÌNH --- */
+async function lockOrientation() {
+    try {
+        if (document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen();
         }
+        if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+        }
+    } catch (e) {
+        console.log("Không thể ép xoay ngang tự động:", e);
+    }
+}
 
-        // Bắn súng
-        if (this.cooldown > 0) this.cooldown--;
-        if (shootPressed && this.cooldown <= 0) this.shoot();
+/* --- VẬT LÝ VA CHẠM --- */
+function isWall(x, y) {
+    let gx = Math.floor(x / GRID), gy = Math.floor(y / GRID);
+    if (!map[gy] || map[gy][gx] !== '1') return false;
+    
+    // Kiểm tra va chạm với tường mỏng ở giữa ô
+    let wx = gx * GRID + (GRID - WALL_THICK)/2;
+    let wy = gy * GRID + (GRID - WALL_THICK)/2;
+    return (x > wx && x < wx + WALL_THICK && y > wy && y < wy + WALL_THICK);
+}
+
+// Hàm di chuyển trượt để chống kẹt
+function moveEntity(ent, vx, vy) {
+    if (!isWall(ent.x + vx, ent.y)) ent.x += vx;
+    if (!isWall(ent.x, ent.y + vy)) ent.y += vy;
+}
+
+class Tank {
+    constructor() { this.x = 100; this.y = 100; this.hp = 5; this.lv = 1; this.ang = 0; this.cd = 0; }
+    update() {
+        if (joy.active) {
+            this.ang = joy.ang;
+            moveEntity(this, Math.cos(this.ang)*3.5, Math.sin(this.ang)*3.5);
+        }
+        if (this.cd > 0) this.cd--;
+        if (shooting && this.cd <= 0) this.shoot();
         
-        // Ăn vật phẩm
         items = items.filter(it => {
-            if (Math.hypot(this.x - it.x, this.y - it.y) < 30) {
-                if (this.gunLv < 5) this.gunLv++;
-                score += 50;
-                createParticles(it.x, it.y, '#00ffff', 5);
-                return false;
-            }
+            if (Math.hypot(this.x-it.x, this.y-it.y) < 25) { this.lv++; return false; }
             return true;
         });
     }
-
     shoot() {
-        let count = 1;
-        let spread = 0;
-        if (this.gunLv === 2) { count = 2; spread = 0.1; }
-        if (this.gunLv >= 3) { count = 3; spread = 0.2; }
-        if (this.gunLv >= 5) { count = 5; spread = 0.3; }
-
-        for(let i=0; i<count; i++) {
-            let a = this.angle - spread/2 + (Math.random() * spread);
-            if (count > 1) a = this.angle - spread/2 + (i * spread/(count-1));
-            bullets.push(new Bullet(this.x, this.y, a, true));
+        let n = this.lv >= 3 ? 3 : 1;
+        for(let i=0; i<n; i++) {
+            bullets.push({x:this.x, y:this.y, a:this.ang + (i-Math.floor(n/2))*0.2, life:100});
         }
-        this.cooldown = 10; // Tốc độ bắn nhanh
+        this.cd = 15;
     }
-
     draw() {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-        
-        // Thân xe màu đỏ
-        ctx.fillStyle = "var(--player-color)";
-        ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 10;
-        ctx.beginPath(); ctx.arc(0, 0, TANK_RADIUS, 0, Math.PI*2); ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // Nòng súng
-        ctx.fillStyle = "#c0392b";
-        ctx.fillRect(0, -6, 25, 12);
-        
-        ctx.restore();
+        ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.ang);
+        ctx.fillStyle = "var(--player)"; ctx.beginPath(); ctx.arc(0,0,TANK_R,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#000"; ctx.fillRect(0,-3,18,6); ctx.restore();
     }
 }
 
 class Zombie {
-    constructor(x, y) {
-        this.x = x; this.y = y;
-        this.radius = 16;
-        this.hp = 3;
-        this.speed = 1.5 + Math.random();
-    }
-    update(target) {
-        let dx = target.x - this.x;
-        let dy = target.y - this.y;
-        let dist = Math.sqrt(dx*dx + dy*dy);
-        let angle = Math.atan2(dy, dx);
-
-        let nextX = this.x + Math.cos(angle) * this.speed;
-        let nextY = this.y + Math.sin(angle) * this.speed;
-
-        // Zombie cũng phải tránh tường
-        if (!checkWall(nextX, nextY)) {
-            this.x = nextX; this.y = nextY;
-        }
-
-        // Tấn công
-        if (dist < TANK_RADIUS + this.radius) {
-            target.hp -= 0.05;
-            createParticles(target.x, target.y, 'red', 1);
-        }
-    }
-    draw() {
-        ctx.fillStyle = "var(--zombie-color)";
-        ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2); ctx.fill();
-        // Mắt zombie
-        ctx.fillStyle = "yellow";
-        ctx.beginPath(); ctx.arc(this.x - 5, this.y - 5, 4, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(this.x + 5, this.y - 5, 4, 0, Math.PI*2); ctx.fill();
-    }
-}
-
-class Bullet {
-    constructor(x, y, angle, isPlayer) {
-        this.x = x; this.y = y;
-        this.vx = Math.cos(angle) * 10;
-        this.vy = Math.sin(angle) * 10;
-        this.life = 60;
+    constructor() {
+        this.x = Math.random() > 0.5 ? 50 : 750;
+        this.y = Math.random() * 400;
+        this.hp = 2;
     }
     update() {
-        this.x += this.vx; this.y += this.vy;
-        this.life--;
-        // Đạn nảy tường (hoặc vỡ)
-        if (checkWall(this.x, this.y)) {
-            this.life = 0;
-            createParticles(this.x, this.y, 'orange', 3);
-        }
+        let a = Math.atan2(player.y - this.y, player.x - this.x);
+        moveEntity(this, Math.cos(a)*1.5, Math.sin(a)*1.5);
+        if (Math.hypot(player.x-this.x, player.y-this.y) < 25) player.hp -= 0.02;
     }
     draw() {
-        ctx.fillStyle = "#f1c40f";
-        ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "var(--zombie)"; ctx.beginPath(); ctx.arc(this.x, this.y, 14, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(this.x-4, this.y-4, 3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x+4, this.y-4, 3, 0, Math.PI*2); ctx.fill();
     }
 }
 
-/* --- HỆ THỐNG VẬT LÝ & LOGIC CHUNG --- */
+/* --- ĐIỀU KHIỂN --- */
+const stick = document.getElementById('stick');
+const joyZone = document.getElementById('joyZone');
 
-// Kiểm tra va chạm Tường (Quan trọng: Hitbox hình tròn vs Tường nhỏ)
-function checkWall(x, y) {
-    // Chuyển đổi tọa độ pixel sang tọa độ lưới
-    let gx = Math.floor(x / BLOCK_SIZE);
-    let gy = Math.floor(y / BLOCK_SIZE);
-    
-    // Nếu ra ngoài map
-    if (gy < 0 || gy >= map.length || gx < 0 || gx >= map[0].length) return true;
-
-    // Nếu ô đó là tường
-    if (map[gy][gx] === '1') {
-        // Kiểm tra va chạm chi tiết (AABB vs Circle)
-        // Tường thực tế được vẽ nhỏ hơn ô lưới để tạo khe hở
-        let wx = gx * BLOCK_SIZE + (BLOCK_SIZE - WALL_SIZE)/2;
-        let wy = gy * BLOCK_SIZE + (BLOCK_SIZE - WALL_SIZE)/2;
-        
-        // Tìm điểm gần nhất trên hình chữ nhật tường với tâm vòng tròn
-        let testX = x;
-        let testY = y;
-        
-        if (x < wx) testX = wx;
-        else if (x > wx + WALL_SIZE) testX = wx + WALL_SIZE;
-        
-        if (y < wy) testY = wy;
-        else if (y > wy + WALL_SIZE) testY = wy + WALL_SIZE;
-        
-        let distX = x - testX;
-        let distY = y - testY;
-        let distance = Math.sqrt(distX*distX + distY*distY);
-        
-        if (distance <= TANK_RADIUS) {
-            return true; // Va chạm thật sự
-        }
-    }
-    return false;
+function handleJoy(ex, ey, end) {
+    if (end) { joy.active = false; stick.style.transform = `translate(-50%,-50%)`; return; }
+    let r = joyZone.getBoundingClientRect();
+    let dx = ex - (r.left + 70), dy = ey - (r.top + 70);
+    let d = Math.min(Math.sqrt(dx*dx+dy*dy), 50);
+    joy.active = true; joy.ang = Math.atan2(dy, dx);
+    stick.style.transform = `translate(calc(-50% + ${(dx/d)*d}px), calc(-50% + ${(dy/d)*d}px))`;
 }
 
-function createParticles(x, y, color, count) {
-    for(let i=0; i<count; i++) {
-        particles.push({
-            x: x, y: y,
-            vx: (Math.random() - 0.5) * 5,
-            vy: (Math.random() - 0.5) * 5,
-            life: 20,
-            color: color
-        });
-    }
-}
+joyZone.ontouchstart = e => handleJoy(e.touches[0].clientX, e.touches[0].clientY);
+joyZone.ontouchmove = e => { e.preventDefault(); handleJoy(e.touches[0].clientX, e.touches[0].clientY); };
+joyZone.ontouchend = () => handleJoy(0,0,true);
+document.getElementById('shootBtn').ontouchstart = () => shooting = true;
+document.getElementById('shootBtn').ontouchend = () => shooting = false;
 
-let player;
-
-function startGame(fullscreen) {
-    if (fullscreen) {
-        let elem = document.documentElement;
-        if (elem.requestFullscreen) elem.requestFullscreen();
-    }
-    
+/* --- VÒNG LẶP --- */
+async function start(f) {
+    if (f) await lockOrientation();
     document.getElementById('menu').style.display = 'none';
-    player = new Player();
-    enemies = [];
-    bullets = [];
-    items = [];
-    score = 0;
-    gameRunning = true;
-    gameLoop();
+    player = new Tank(); enemies = []; bullets = []; items = []; score = 0;
+    active = true; loop();
 }
 
-function gameLoop() {
-    if (!gameRunning) return;
-    
-    ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    frame++;
+function loop() {
+    if (!active) return;
+    ctx.clearRect(0,0,800,450); frame++;
 
-    // 1. Vẽ Map
-    for(let y=0; y<map.length; y++) {
-        for(let x=0; x<map[y].length; x++) {
-            if (map[y][x] === '1') {
-                // Vẽ tường nhỏ hơn ô lưới
-                let gap = (BLOCK_SIZE - WALL_SIZE) / 2;
-                ctx.fillStyle = "var(--wall-color)";
-                ctx.fillRect(x*BLOCK_SIZE + gap, y*BLOCK_SIZE + gap, WALL_SIZE, WALL_SIZE);
-                // Viền sáng để tường nổi bật trên nền xám
-                ctx.strokeStyle = "#555";
-                ctx.strokeRect(x*BLOCK_SIZE + gap, y*BLOCK_SIZE + gap, WALL_SIZE, WALL_SIZE);
-            }
-        }
-    }
+    // Vẽ Map
+    ctx.fillStyle = "var(--wall)";
+    map.forEach((row, y) => row.split('').forEach((c, x) => {
+        if(c==='1') ctx.fillRect(x*GRID+(GRID-WALL_THICK)/2, y*GRID+(GRID-WALL_THICK)/2, WALL_THICK, WALL_THICK);
+    }));
 
-    // 2. Logic Player
-    player.update();
-    player.draw();
+    player.update(); player.draw();
 
-    // 3. Logic Zombies
-    if (frame % 60 === 0) { // Spawn zombie mỗi giây
-        // Tìm vị trí spawn xa người chơi
-        let zx, zy;
-        do {
-            zx = Math.random() * GAME_WIDTH;
-            zy = Math.random() * GAME_HEIGHT;
-        } while (Math.hypot(zx - player.x, zy - player.y) < 300 || checkWall(zx, zy));
-        enemies.push(new Zombie(zx, zy));
-    }
-
+    if (frame % 80 === 0) enemies.push(new Zombie());
     enemies.forEach((z, i) => {
-        z.update(player);
-        z.draw();
-        if (z.hp <= 0) {
-            enemies.splice(i, 1);
-            score += 10;
-            createParticles(z.x, z.y, 'lime', 8);
-            if (Math.random() < 0.1) items.push({x: z.x, y: z.y}); // 10% rớt súng
+        z.update(); z.draw();
+        if (z.hp <= 0) { 
+            enemies.splice(i, 1); score += 10; 
+            if(Math.random()<0.1) items.push({x:z.x, y:z.y});
         }
     });
 
-    // 4. Logic Đạn
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        let b = bullets[i];
-        b.update();
-        b.draw();
-        
-        let hit = false;
-        // Trúng zombie
-        enemies.forEach(z => {
-            if (!hit && Math.hypot(b.x - z.x, b.y - z.y) < z.radius + 5) {
-                z.hp -= 1;
-                hit = true;
-                b.life = 0;
-            }
-        });
-
-        if (b.life <= 0) bullets.splice(i, 1);
-    }
-
-    // 5. Hiệu ứng hạt
-    particles.forEach((p, i) => {
-        p.x += p.vx; p.y += p.vy; p.life--;
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.x, p.y, 3, 3);
-        if (p.life <= 0) particles.splice(i, 1);
+    bullets = bullets.filter(b => {
+        b.x += Math.cos(b.a)*8; b.y += Math.sin(b.a)*8; b.life--;
+        ctx.fillStyle = "yellow"; ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI*2); ctx.fill();
+        enemies.forEach(z => { if(Math.hypot(b.x-z.x, b.y-z.y)<15){ z.hp--; b.life=0; }});
+        return b.life > 0 && !isWall(b.x, b.y);
     });
 
-    // 6. Vẽ Items
-    items.forEach(it => {
-        ctx.fillStyle = "cyan";
-        ctx.beginPath(); ctx.arc(it.x, it.y, 8, 0, Math.PI*2); ctx.fill();
-        ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
-    });
+    items.forEach(it => { ctx.fillStyle = "cyan"; ctx.fillRect(it.x-8, it.y-8, 16, 16); });
 
-    // 7. UI Update
-    document.getElementById('score').innerText = score;
-    document.getElementById('hp').innerText = Math.floor(player.hp);
-    document.getElementById('gun').innerText = player.gunLv;
+    document.getElementById('sc').innerText = score;
+    document.getElementById('hp').innerText = Math.ceil(player.hp);
+    document.getElementById('lv').innerText = player.lv;
 
     if (player.hp <= 0) {
-        alert("GAME OVER! Điểm: " + score);
-        location.reload();
-        gameRunning = false;
+        active = false;
+        alert("BẠN ĐÃ THUA! SCORE: " + score);
+        document.getElementById('menu').style.display = 'flex'; // Quay về menu không reload
+    } else {
+        requestAnimationFrame(loop);
     }
-
-    requestAnimationFrame(gameLoop);
 }
-
 </script>
 </body>
 </html>
